@@ -16,6 +16,12 @@ export default function Overview() {
       .catch((e) => setErr(e.message || "Failed to load overview summary."));
   }, [days]);
 
+  // Derived counts from appointments_by_status
+  const waiting = s ? ((s.appointments_by_status?.["pending_payment"] ?? 0) + (s.appointments_by_status?.["confirmed"] ?? 0)) : 0;
+  const noShows = s ? (s.appointments_by_status?.["no_show"] ?? 0) : 0;
+  const counselled = s ? (s.appointments_by_status?.["completed"] ?? 0) : 0;
+  const totalAppts = s ? Object.values(s.appointments_by_status ?? {}).reduce((a, b) => a + b, 0) : 0;
+
   return (
     <>
       <PageHeader title="Overview">
@@ -34,6 +40,7 @@ export default function Overview() {
         <p className="text-slate-500">{err ? "" : "Loading…"}</p>
       ) : (
         <div className="space-y-6">
+          {/* Top KPI row */}
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <Stat
               label="Fees collected"
@@ -56,6 +63,33 @@ export default function Overview() {
               label="Patient turnout"
               value={pct(s.turnout_rate ?? 0)}
               hint="attended ÷ (attended + no-show)"
+            />
+          </div>
+
+          {/* Appointment status row */}
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <Stat
+              label="Total appointments"
+              value={String(totalAppts)}
+              hint={`last ${s.period_days ?? days} days`}
+            />
+            <Stat
+              label="Waiting / Scheduled"
+              value={String(waiting)}
+              hint="pending payment + confirmed"
+              tone="text-blue-600"
+            />
+            <Stat
+              label="Counselled"
+              value={String(counselled)}
+              hint="completed consultations"
+              tone="text-emerald-600"
+            />
+            <Stat
+              label="No shows"
+              value={String(noShows)}
+              hint="missed appointments"
+              tone={noShows > 0 ? "text-red-600" : ""}
             />
           </div>
 
@@ -104,7 +138,7 @@ export default function Overview() {
               <Bars
                 items={Object.entries(s.appointments_by_status ?? {}).map(
                   ([label, value]) => ({
-                    label: label.replace("_", " "),
+                    label: label.replace(/_/g, " "),
                     value,
                   })
                 )}

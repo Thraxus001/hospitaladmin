@@ -88,7 +88,7 @@ export default function Settings() {
         </p>
         {savedMsg && (
           <p className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm font-medium text-emerald-800">
-            ✓ {savedMsg}
+            {savedMsg}
           </p>
         )}
         <ErrorText msg={settingsErr} />

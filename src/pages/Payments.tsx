@@ -18,7 +18,7 @@ export default function Payments() {
 
   const totals = useMemo(() => {
     const t = (s: string) => (rows ?? []).filter((r) => r.status === s).reduce((a, r) => a + r.amount, 0);
-    return { paid: t("paid"), refundDue: t("refund_due"), refunded: t("refunded") };
+    return { paid: t("paid"), pending: t("pending"), refundDue: t("refund_due"), refunded: t("refunded") };
   }, [rows]);
 
   const refund = async (p: PaymentRow) => {
@@ -28,8 +28,8 @@ export default function Payments() {
 
   const exportCsv = () =>
     downloadCsv(`payments-${new Date().toISOString().slice(0, 10)}.csv`, [
-      ["ID", "Appointment", "Patient", "Doctor", "Method", "Amount", "Status", "Reference", "Date"],
-      ...(rows ?? []).map((r) => [r.id, r.appointment_id, r.patient, r.doctor, r.method, r.amount, r.status, r.provider_ref ?? "", r.created_at]),
+      ["ID", "Appointment", "Appt Date", "Patient", "Doctor", "Method", "Amount", "Status", "Reference", "Payment Date"],
+      ...(rows ?? []).map((r) => [r.id, r.appointment_id, r.appointment_at ? fmtDateTime(r.appointment_at) : "", r.patient, r.doctor, r.method, r.amount, r.status, r.provider_ref ?? "", fmtDateTime(r.created_at)]),
     ]);
 
   return (
@@ -41,15 +41,22 @@ export default function Payments() {
         <Button variant="outline" onClick={exportCsv} disabled={!rows?.length}>Export CSV</Button>
       </PageHeader>
       <ErrorText msg={err} />
-      <div className="mb-5 grid grid-cols-3 gap-4">
+      <div className="mb-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Stat label="Paid (shown)" value={money(totals.paid)} />
+        <Stat label="Pending" value={money(totals.pending)} tone={totals.pending ? "text-amber-600" : ""} />
         <Stat label="Refunds due" value={money(totals.refundDue)} tone={totals.refundDue ? "text-orange-600" : ""} />
         <Stat label="Refunded" value={money(totals.refunded)} />
       </div>
-      <Table head={["Date", "Patient", "Doctor", "Method", "Amount", "Status", "Reference", ""]} empty={rows && !rows.length ? "No payments found." : rows ? undefined : "Loading…"}>
+      <Table
+        head={["Payment Date", "Appt Date & Time", "Patient", "Doctor", "Method", "Amount", "Status", "Reference", ""]}
+        empty={rows && !rows.length ? "No payments found." : rows ? undefined : "Loading…"}
+      >
         {rows?.map((r) => (
           <tr key={r.id}>
-            <td className="whitespace-nowrap px-4 py-3">{fmtDateTime(r.created_at)}</td>
+            <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{fmtDateTime(r.created_at)}</td>
+            <td className="whitespace-nowrap px-4 py-3 font-medium">
+              {r.appointment_at ? fmtDateTime(r.appointment_at) : <span className="text-slate-400">—</span>}
+            </td>
             <td className="px-4 py-3">{r.patient}</td>
             <td className="px-4 py-3">{r.doctor}</td>
             <td className="px-4 py-3 capitalize">{r.method}</td>

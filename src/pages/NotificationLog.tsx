@@ -48,7 +48,7 @@ export default function NotificationLog() {
             <td className="px-4 py-3 font-mono text-xs">{n.kind}</td>
             <td className="max-w-xs px-4 py-3 text-slate-600"><div className="line-clamp-2" title={n.body}>{n.body}</div></td>
             <td className="px-4 py-3"><Badge value={n.status} />{n.error && n.status !== "dry_run" && <div className="mt-1 max-w-[12rem] truncate text-xs text-red-600" title={n.error}>{n.error}</div>}</td>
-            <td className="px-4 py-3 text-right">{n.status === "failed" && <Button variant="outline" onClick={() => retry(n)}>Retry</Button>}</td>
+            <td className="px-4 py-3 text-right">{(n.status === "failed" || n.status === "dry_run") && <Button variant="outline" onClick={() => retry(n)}>Retry</Button>}</td>
           </tr>
         ))}
       </Table>

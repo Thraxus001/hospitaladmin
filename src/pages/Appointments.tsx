@@ -3,9 +3,21 @@ import { api, fmtDateTime, fmtTime, money, todayKey } from "../lib/api";
 import type { Appointment, Doctor, SlotRow, User } from "../lib/types";
 import { Badge, Button, ErrorText, inputCls, Label, Modal, PageHeader, Table } from "../components";
 
+const ALL_STATUSES = ["", "pending_payment", "confirmed", "completed", "no_show", "cancelled", "rescheduled"] as const;
+const STATUS_LABELS: Record<string, string> = {
+  "": "All statuses",
+  pending_payment: "Waiting (pending payment)",
+  confirmed: "Waiting (confirmed)",
+  completed: "Counselled",
+  no_show: "No show",
+  cancelled: "Cancelled",
+  rescheduled: "Rescheduled",
+};
+
 export default function Appointments() {
-  const [day, setDay] = useState(todayKey());
+  const [day, setDay] = useState("");
   const [doctorId, setDoctorId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [rows, setRows] = useState<Appointment[] | null>(null);
   const [err, setErr] = useState("");
@@ -13,8 +25,15 @@ export default function Appointments() {
 
   const load = useCallback(() => {
     setRows(null);
-    api<Appointment[]>(`/admin/appointments?day=${day}${doctorId ? `&doctor_id=${doctorId}` : ""}`).then(setRows).catch((e) => { setErr(e.message); setRows([]); });
-  }, [day, doctorId]);
+    const qs = new URLSearchParams();
+    if (day) qs.set("day", day);
+    if (doctorId) qs.set("doctor_id", doctorId);
+    const url = `/admin/appointments${qs.toString() ? `?${qs}` : ""}`;
+    api<Appointment[]>(url).then((data) => {
+      // Apply status filter client-side so we don't need a backend change
+      setRows(statusFilter ? data.filter((a) => a.status === statusFilter) : data);
+    }).catch((e) => { setErr(e.message); setRows([]); });
+  }, [day, doctorId, statusFilter]);
 
   useEffect(() => { api<Doctor[]>("/admin/doctors").then(setDoctors).catch(() => {}); }, []);
   useEffect(load, [load]);
@@ -25,21 +44,64 @@ export default function Appointments() {
     catch (e) { setErr((e as Error).message); }
   };
 
+  // Summary counts from current rows
+  const counts = rows ? {
+    waiting: rows.filter((r) => r.status === "pending_payment" || r.status === "confirmed").length,
+    counselled: rows.filter((r) => r.status === "completed").length,
+    no_show: rows.filter((r) => r.status === "no_show").length,
+  } : null;
+
   return (
     <>
       <PageHeader title="Appointments">
-        <input type="date" className={`${inputCls} w-auto`} value={day} onChange={(e) => setDay(e.target.value)} />
+        <input
+          type="date"
+          className={`${inputCls} w-auto`}
+          value={day}
+          onChange={(e) => setDay(e.target.value)}
+          title="Filter by date (leave blank for all)"
+        />
         <select className={`${inputCls} w-auto`} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
           <option value="">All doctors</option>
           {doctors.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
         </select>
+        <select className={`${inputCls} w-auto`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          {ALL_STATUSES.map((s) => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </select>
         <Button onClick={() => setModal(true)}>+ Priority booking</Button>
       </PageHeader>
+
+      {/* Quick summary badges */}
+      {counts && (
+        <div className="mb-4 flex flex-wrap gap-3">
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">
+            Waiting: {counts.waiting}
+          </span>
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-800">
+            Counselled: {counts.counselled}
+          </span>
+          <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-800">
+            No shows: {counts.no_show}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+            Total shown: {rows?.length ?? 0}
+          </span>
+        </div>
+      )}
+
       <ErrorText msg={err} />
-      <Table head={["Time", "Patient", "Doctor", "Status", "Priority", "Fee", ""]} empty={rows && !rows.length ? "No appointments for this day." : rows ? undefined : "Loading…"}>
+      <Table
+        head={["Date & Time", "Patient", "Doctor", "Status", "Priority", "Fee", ""]}
+        empty={rows && !rows.length ? "No appointments found." : rows ? undefined : "Loading…"}
+      >
         {rows?.map((a) => (
           <tr key={a.id}>
-            <td className="px-4 py-3 font-medium">{fmtTime(a.start_at)}–{fmtTime(a.end_at)}</td>
+            <td className="whitespace-nowrap px-4 py-3 font-medium">
+              <div>{fmtDateTime(a.start_at)}</div>
+              <div className="text-xs text-slate-500">–{fmtTime(a.end_at)}</div>
+            </td>
             <td className="px-4 py-3">{a.patient?.full_name}<div className="text-xs text-slate-500">{a.patient?.phone}</div></td>
             <td className="px-4 py-3">{a.doctor.full_name}<div className="text-xs text-slate-500">{a.doctor.specialty}</div></td>
             <td className="px-4 py-3"><Badge value={a.status} />{a.rescheduled_from_id && <div className="mt-1 text-xs text-blue-600">rescheduled</div>}</td>
@@ -54,7 +116,7 @@ export default function Appointments() {
           </tr>
         ))}
       </Table>
-      {modal && <PriorityModal doctors={doctors} defaultDay={day} onClose={() => setModal(false)} onDone={() => { setModal(false); load(); }} />}
+      {modal && <PriorityModal doctors={doctors} defaultDay={day || todayKey()} onClose={() => setModal(false)} onDone={() => { setModal(false); load(); }} />}
     </>
   );
 }

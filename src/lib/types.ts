@@ -12,12 +12,13 @@ export type ScheduleWindow = { id: number; weekday: number; start_time: string; 
 export type SlotRow = { start_at: string; end_at: string; occupied: boolean; bumpable: boolean; patient: string | null };
 export type PaymentRow = {
   id: number; appointment_id: number; patient: string; doctor: string; method: string; amount: number;
-  status: string; provider_ref: string | null; created_at: string;
+  status: string; provider_ref: string | null; created_at: string; appointment_at: string | null;
 };
 export type AuditRow = { id: number; admin: string; action: string; detail: string; created_at: string };
 export type Summary = {
   period_days: number; collected: number; collected_by_method: Record<string, number>;
   pending_payments: number; refunds_due: number; appointments_by_status: Record<string, number>;
+  total_appointments: number; waiting: number; no_shows: number; counselled: number;
   turnout_rate: number | null; bookings_per_doctor: Record<string, number>;
   daily_collected: { date: string; amount: number }[]; bookings_by_hour: Record<string, number>;
 };
